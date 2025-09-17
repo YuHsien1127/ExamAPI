@@ -60,7 +60,7 @@ namespace ExamAPI.Services
                 response.UserName = user.UserName;
                 response.UserRole = user.UserRole;
                 response.LoginTime = DateTime.Now;
-                response.Token = _tokenService.GenerateJwtToken(user.UserAccount, user.UserRole);
+                response.Token = $"Bearer {_tokenService.GenerateJwtToken(user.UserAccount, user.UserRole)}";
             }
             catch(Exception ex)
             {
@@ -124,7 +124,7 @@ namespace ExamAPI.Services
                     UserEmail = userRequest.UserEmail,
                     CreateDate = DateTime.Now,
                     Creator = userRequest.UserName,
-                    Modifier = userRequest.UserName
+                    Modifier = "System"
                 };
                 await _userRepository.AddUserAsync(user);
                 int count = _context.SaveChanges();
@@ -152,7 +152,7 @@ namespace ExamAPI.Services
             }
             catch(Exception ex)
             {
-                _logger.LogError(ex,"新增發生錯誤"); //log 嚴重錯誤
+                _logger.LogError(ex,"新增發生錯誤");
                 response.Success = false;
                 response.Message = "新增發生錯誤";
             }
@@ -222,7 +222,7 @@ namespace ExamAPI.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "修改發生錯誤"); //log 嚴重錯誤
+                _logger.LogError(ex, "修改發生錯誤");
                 response.Success = false;
                 response.Message = "修改發生錯誤";
             }

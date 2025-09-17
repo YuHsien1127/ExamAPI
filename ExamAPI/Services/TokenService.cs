@@ -28,7 +28,7 @@ namespace ExamAPI.Services
             // 建立 JWT 的 Claims（聲明）
             var claims = new[]
             {
-                new Claim(ClaimTypes.Email, userAccount),
+                new Claim(JwtRegisteredClaimNames.Sub, userAccount),
                 new Claim(ClaimTypes.Role, role),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
             };

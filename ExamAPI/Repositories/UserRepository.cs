@@ -12,9 +12,9 @@ namespace ExamAPI.Repositories
             _context = context;
         }
 
-        public async Task<IQueryable<User>> GetAllUsersAsync()
+        public IQueryable<User> GetAllUsers()
         {
-            return await Task.FromResult(_context.Users);
+            return _context.Users;
         }
         public async Task<User> GetUserBySerialNoAsync(int serialNo)
         {

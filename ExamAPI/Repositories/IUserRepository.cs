@@ -4,7 +4,7 @@ namespace ExamAPI.Repositories
 {
     public interface IUserRepository
     {
-        public Task<IQueryable<User>> GetAllUsersAsync();
+        public IQueryable<User> GetAllUsers();
         public Task<User> GetUserBySerialNoAsync(int serialNo);
         public Task<User> GetUserByUserAccountAsync(string account);
         public Task AddUserAsync(User user);

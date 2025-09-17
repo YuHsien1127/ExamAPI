@@ -11,7 +11,7 @@ namespace ExamAPI.Models
         }
 
         public string OrderNo { get; set; } = null!;
-        public string OrderSubject { get; set; } = null!;
+        public string? OrderSubject { get; set; }
         public string OrderApplicant { get; set; } = null!;
         public string Status { get; set; } = null!;
         public DateTime CreateDate { get; set; }

@@ -19,16 +19,34 @@ namespace ExamAPI.Controllers
             _userService = userService;
         }
         
+        /// <summary>
+        /// 登入
+        /// </summary>
+        /// <param name="loginRequest">帳號、密碼</param>
+        /// <returns></returns>
         [HttpPost]
         public async Task<IActionResult> Login([FromBody] LoginRequest loginRequest)
         {
             return new JsonResult(await _userService.LoginAsync(loginRequest));
         }
+
+        /// <summary>
+        /// 新增 User 資料
+        /// </summary>
+        /// <param name="userRequest">User 資料</param>
+        /// <returns></returns>
         [HttpPost]
         public async Task<UserResponse> AddUserAsync([FromBody] UserRequest userRequest)
         {
             return await _userService.AddUserAsync(userRequest);
         }
+
+        /// <summary>
+        /// 修改 User 資料
+        /// </summary>
+        /// <param name="userRequest">User 資料</param>
+        /// <param name="serial">流水號</param>
+        /// <returns></returns>
         [HttpPut]
         [Authorize(Roles = "admin, customer")]
         public async Task<UserResponse> UpdateUserAsync([FromBody] UserRequest userRequest, int serial = 0)
