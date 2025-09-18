@@ -43,10 +43,10 @@ namespace ExamAPI.Services
             _logger.LogDebug("取得Product數量：{p.Count()}", p.Count());
             var pagedList = p.ToPagedList(page, pageSize);
             response.Products = pagedList.ToList();
-            response.PageCount = pagedList.Count;
+            response.PageCount = pagedList.PageCount;
             response.TotalCount = pagedList.TotalItemCount;
             response.Success = true;
-            response.Message = "查詢成功";
+            response.Message = $"取得第{page}頁，{pageSize}筆資料";
             _logger.LogTrace("離開GetAllProductsAsync");
             return response;
         }
@@ -88,7 +88,7 @@ namespace ExamAPI.Services
                 {
                     ProductNo = $"PT{number:D8}",
                     ProductName = productRequest.ProductName,
-                    ProductPrice = productRequest.ProductPrice,
+                    ProductPrice = (decimal)productRequest.ProductPrice,
                     CreateDate = DateTime.Now,
                     Creator = user.UserName,
                     ModifyDate = DateTime.Now,
@@ -156,8 +156,7 @@ namespace ExamAPI.Services
                 // 更新產品資訊
                 existingProduct.ProductName = string.IsNullOrEmpty(productRequest.ProductName)
                     ? existingProduct.ProductName : productRequest.ProductName;
-                existingProduct.ProductPrice = productRequest.ProductPrice == null
-                    ? existingProduct.ProductPrice : productRequest.ProductPrice;
+                existingProduct.ProductPrice = productRequest.ProductPrice ?? existingProduct.ProductPrice;
                 existingProduct.ModifyDate = DateTime.Now;
                 existingProduct.Modifier = user.UserName;
                 await _productRepository.UpdateProductAsync(existingProduct);

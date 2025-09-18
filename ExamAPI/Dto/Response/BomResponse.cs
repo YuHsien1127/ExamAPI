@@ -10,9 +10,7 @@
     {
         public int SerialNo { get; set; }
         public string ProductNo { get; set; } = null!;
-        public ProductDto? Product { get; set; }
         public string MaterialNo { get; set; } = null!;
-        public MaterialDto? Material { get; set; }
         public int MaterialUseQuantity { get; set; }
     }
 }

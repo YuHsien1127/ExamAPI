@@ -27,9 +27,9 @@ namespace ExamAPI.Controllers
         /// <param name="pageSize">一頁幾筆</param>
         /// <returns></returns>
         [HttpGet]
-        public async Task<OrderResponse> GetAllOrdersAsync(int page = 1, int pageSize = 10)
+        public OrderResponse GetAllOrders(int page = 1, int pageSize = 10)
         {
-            return await _orderService.GetAllOrdersAsync(page, pageSize);
+            return _orderService.GetAllOrders(page, pageSize);
         }
 
         /// <summary>
@@ -46,24 +46,23 @@ namespace ExamAPI.Controllers
         /// <summary>
         /// 修改訂單
         /// </summary>
-        /// <param name="orderRequest">訂單資料</param>
-        /// <param name="serialNo">流水號</param>
+        /// <param name="orderNo">訂單編號</param>
         /// <returns></returns>
         [HttpPut]
-        public async Task<OrderResponse> UpdateOrderAsync([FromBody] OrderRequest orderRequest, int serialNo = 0)
+        public async Task<OrderResponse> UpdateOrderAsync(string orderNo)
         {
-            return await _orderService.UpdateOrderAsync(serialNo, orderRequest);
+            return await _orderService.UpdateOrderAsync(orderNo);
         }
 
         /// <summary>
         /// 取消訂單
         /// </summary>
-        /// <param name="serialNo">流水號</param>
+        /// <param name="orderNo">訂單編號</param>
         /// <returns></returns>
         [HttpDelete]
-        public async Task<OrderResponse> CancelOrderAsync(int serialNo = 0)
+        public async Task<OrderResponse> CancelOrderAsync(string orderNo)
         {
-            return await _orderService.CancelOrderAsync(serialNo);
+            return await _orderService.CancelOrderAsync(orderNo);
         }
     }
 }

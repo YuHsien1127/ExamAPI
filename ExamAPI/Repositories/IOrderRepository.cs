@@ -7,9 +7,9 @@ namespace ExamAPI.Repositories
     {
         public IQueryable<Order> GetAllOrders();
         public Task<Order> GetOrderByOrderNoAsync(string orderNo);
-        public Task AddOrderAsync(Order order);
-        public Task AddOrderDetailAsync(List<OrderDetail> orderDetail);
+        public Task<List<OrderDetail>> GetOrderDetailByOrderNoAsync(string orderNo);
+        public Task AddOrderAsync(Order order, List<OrderDetail> orderDetail);
         public Task UpdateOrderAsync(Order order);
-        public Task CancelOrderAsync(Order order);
+        public Task CancelOrderAsync(Order order, List<OrderDetail> orderDetail);
     }
 }

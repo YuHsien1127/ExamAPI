@@ -27,9 +27,9 @@ namespace ExamAPI.Controllers
         /// <param name="pageSize">一頁幾筆</param>
         /// <returns></returns>
         [HttpGet]
-        public async Task<MaterialResponse> GetAllMaterialsAsync(int page = 1, int pageSize = 10)
+        public MaterialResponse GetAllMaterials(int page = 1, int pageSize = 10)
         {
-            return await _materialService.GetAllMaterialsAsync(page, pageSize);
+            return _materialService.GetAllMaterials(page, pageSize);
         }
 
         /// <summary>

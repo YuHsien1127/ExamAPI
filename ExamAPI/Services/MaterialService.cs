@@ -42,10 +42,10 @@ namespace ExamAPI.Services
             _logger.LogDebug("取得物料數量：{m.Count()}", m.Count());
             var pagedList = m.ToPagedList(page, pageSize);
             response.Materials = pagedList.ToList();
-            response.PageCount = pagedList.Count;
+            response.PageCount = pagedList.PageCount;
             response.TotalCount = pagedList.TotalItemCount;
             response.Success = true;
-            response.Message = "查詢成功";
+            response.Message = $"取得第{page}頁，{pageSize}筆資料";
             _logger.LogTrace("離開GetAllMaterialsAsync");
             return response;
         }
@@ -111,9 +111,9 @@ namespace ExamAPI.Services
                 }
                 else
                 {
-                    _logger.LogWarning("新增產品失敗");
+                    _logger.LogWarning("新增物料失敗");
                     response.Success = false;
-                    response.Message = "新增產品失敗";
+                    response.Message = "新增物料失敗";
                 }
             }
             catch(Exception ex)
@@ -153,7 +153,7 @@ namespace ExamAPI.Services
                 var user = await _userRepository.GetUserByUserAccountAsync(userAccount);
                 existMaterial.MaterialName = string.IsNullOrEmpty(materialRequest.MaterialName)
                     ? existMaterial.MaterialName : materialRequest.MaterialName;
-                existMaterial.MaterialCost = materialRequest.MaterialCost == null
+                existMaterial.MaterialCost = materialRequest.MaterialCost == 0
                     ? existMaterial.MaterialCost : materialRequest.MaterialCost;
                 existMaterial.CurrentStock = materialRequest.CurrentStock == null
                     ? existMaterial.CurrentStock : materialRequest.CurrentStock;
@@ -177,9 +177,9 @@ namespace ExamAPI.Services
                 }
                 else
                 {
-                    _logger.LogWarning("修改產品失敗");
+                    _logger.LogWarning("修改物料失敗");
                     response.Success = false;
-                    response.Message = "修改產品失敗";
+                    response.Message = "修改物料失敗";
                 }
             }
             catch (Exception ex)

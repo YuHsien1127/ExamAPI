@@ -27,9 +27,9 @@ namespace ExamAPI.Controllers
         /// <param name="pageSize">一頁幾筆</param>
         /// <returns></returns>
         [HttpGet]
-        public async Task<ProductResponse> GetAllProductAsync(int page = 1, int pageSize = 10)
+        public ProductResponse GetAllProduct(int page = 1, int pageSize = 10)
         {
-            return await _productService.GetAllProductsAsync(page, pageSize);
+            return _productService.GetAllProducts(page, pageSize);
         }
 
         /// <summary>
@@ -50,7 +50,7 @@ namespace ExamAPI.Controllers
         /// <param name="productRequest">產品資料</param>
         /// <returns></returns>
         [HttpPut]
-        public async Task<ProductResponse> UpdateProductAsync(string productNo, [FromBody] ProductRequest productRequest)
+        public async Task<ProductResponse> UpdateProductAsync([FromBody] ProductRequest productRequest,string productNo = "")
         {
             return await _productService.UpdateProductAsync(productNo, productRequest);
         }
@@ -61,7 +61,7 @@ namespace ExamAPI.Controllers
         /// <param name="productNo">產品編號</param>
         /// <returns></returns>
         [HttpDelete]
-        public async Task<ProductResponse> DeleteProductAsync(string productNo)
+        public async Task<ProductResponse> DeleteProductAsync(string productNo = "")
         {
             return await _productService.DeleteProductAsync(productNo);
         }

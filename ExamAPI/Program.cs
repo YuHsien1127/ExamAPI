@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
+using Hangfire;
 
 // NLog 初始化
 // 載入 NLog 設定（從 appsettings.json / nlog.config）
@@ -32,6 +33,12 @@ builder.Services.AddSwaggerGen(options =>
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     options.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
 });
+// Hangfire 設定
+builder.Services.AddHangfire(configuration => configuration
+    .UseSqlServerStorage(builder.Configuration.GetConnectionString("HangfireConnection")));
+
+builder.Services.AddHangfireServer();
+builder.Services.AddScoped<IOrderExportService, OrderExportService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
@@ -41,8 +48,9 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
-//builder.Services.AddScoped<IMaterialService, MaterialService>();
-//builder.Services.AddScoped<IBomService, BomService>();
+builder.Services.AddScoped<IMaterialService, MaterialService>();
+builder.Services.AddScoped<IBomService, BomService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
 
 // Add services to the container.
 builder.Services.AddControllers();
@@ -117,4 +125,14 @@ app.UseAuthorization();
 
 app.MapControllers();
 
+// Hangfire Dashboard（僅在開發環境）
+if (app.Environment.IsDevelopment())
+{
+    app.UseHangfireDashboard("/hangfire");
+}
+// 設定排程：每半小時執行一次
+RecurringJob.AddOrUpdate<OrderExportService>(
+    "order-export-job",
+    service => service.ExportOrdersAsync(),
+    "*/30 * * * *");
 app.Run();

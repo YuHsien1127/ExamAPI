@@ -1,4 +1,5 @@
 ﻿using ExamAPI.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace ExamAPI.Repositories
 {
@@ -12,26 +13,29 @@ namespace ExamAPI.Repositories
 
         public IQueryable<Order> GetAllOrders()
         {
-            return _context.Orders;
+            return _context.Orders.Include(od => od.OrderDetails);
         }
 
         public async Task<Order> GetOrderByOrderNoAsync(string orderNo)
         {
             return await _context.Orders.FindAsync(orderNo);
         }
-
-        public async Task AddOrderAsync(Order order)
+        public async Task<List<OrderDetail>> GetOrderDetailByOrderNoAsync(string orderNo)
+        {
+            if (string.IsNullOrEmpty(orderNo))
+                return new List<OrderDetail>();
+            return await _context.OrderDetails.Where(od => od.OrderNo == orderNo).ToListAsync();
+        }
+        public async Task AddOrderAsync(Order order, List<OrderDetail> orderDetail)
         {
             await _context.Orders.AddAsync(order);
-        }
-        public async Task AddOrderDetailAsync(List<OrderDetail> orderDetail)
-        {
             await _context.OrderDetails.AddRangeAsync(orderDetail);
         }
 
-        public async Task CancelOrderAsync(Order order)
+        public async Task CancelOrderAsync(Order order, List<OrderDetail> orderDetail)
         {
             _context.Orders.Remove(order);
+            _context.OrderDetails.RemoveRange(orderDetail);
             await Task.CompletedTask;
         }
 

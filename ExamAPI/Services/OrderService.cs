@@ -3,11 +3,8 @@ using ExamAPI.Dto.Response;
 using ExamAPI.Models;
 using ExamAPI.Repositories;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-using System.Collections.Generic;
 using System.Security.Claims;
 using X.PagedList.Extensions;
-using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace ExamAPI.Services
 {
@@ -17,25 +14,29 @@ namespace ExamAPI.Services
         private readonly IOrderRepository _orderRepository;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly IUserRepository _userRepository;
-        private readonly IProductRepository _productRepository;
         private readonly ILogger<OrderService> _logger;
-        public OrderService(ExamSQLContext context, IOrderRepository orderRepository, IHttpContextAccessor httpContextAccessor, IUserRepository userRepository, ILogger<OrderService> logger, IProductRepository productRepository)
+        private readonly IMaterialRepository _materialRepository;
+        private readonly IBomRepository _bomRepository;
+        private readonly IEmailService _emailService;
+        public OrderService(ExamSQLContext context, IOrderRepository orderRepository, IHttpContextAccessor httpContextAccessor,
+            IUserRepository userRepository, ILogger<OrderService> logger, IMaterialRepository materialRepository
+            , IBomRepository bomRepository, IEmailService emailService)
         {
             _context = context;
             _orderRepository = orderRepository;
             _httpContextAccessor = httpContextAccessor;
             _userRepository = userRepository;
             _logger = logger;
-            _productRepository = productRepository;
+            _materialRepository = materialRepository;
+            _bomRepository = bomRepository;
+            _emailService = emailService;
         }
 
         public OrderResponse GetAllOrders(int page, int pageSize)
         {
             _logger.LogTrace("進入GetAllOrdersAsync");
             OrderResponse response = new OrderResponse();
-            var orders = _orderRepository.GetAllOrders();
-            var query = orders.Include(od => od.OrderDetails);
-            var o = query.Select(x => new OrderDto
+            var orders = _orderRepository.GetAllOrders().Select(x => new OrderDto
             {
                 OrderNo = x.OrderNo,
                 OrderSubject = x.OrderSubject,
@@ -49,13 +50,13 @@ namespace ExamAPI.Services
                     Quantity = y.Quantity
                 }).ToList()
             });
-            _logger.LogDebug("取得訂單數量：{o.Count()}", o.Count());
-            var pagedList = o.ToPagedList(page, pageSize);
+            _logger.LogDebug("取得訂單數量：{o.Count()}", orders.Count());
+            var pagedList = orders.ToPagedList(page, pageSize);
             response.Orders = pagedList.ToList();
-            response.PageCount = pagedList.Count;
+            response.PageCount = pagedList.PageCount;
             response.TotalCount = pagedList.TotalItemCount;
             response.Success = true;
-            response.Message = "查詢成功";
+            response.Message = $"取得第{page}頁，{pageSize}筆資料";
             _logger.LogTrace("離開GetAllOrdersAsync");
             return response;
         }
@@ -107,7 +108,6 @@ namespace ExamAPI.Services
                     ModifyDate = DateTime.Now,
                     Modifier = "System"
                 };
-                await _orderRepository.AddOrderAsync(order);
                 var orderDetail = orderRequest.Details.Select(od => new OrderDetail
                 {
                     OrderNo = order.OrderNo,
@@ -119,9 +119,9 @@ namespace ExamAPI.Services
                     Modifier = "System"
                 }).ToList();
                 _logger.LogTrace("準備新增訂單明細，共{Count}筆", orderDetail.Count);
-                await _orderRepository.AddOrderDetailAsync(orderDetail);
+                await _orderRepository.AddOrderAsync(order, orderDetail);
                 int count = _context.SaveChanges();
-                if(count > 0)
+                if (count > 0)
                 {
                     var o = new OrderDto
                     {
@@ -129,7 +129,7 @@ namespace ExamAPI.Services
                         OrderSubject = order.OrderSubject,
                         OrderApplicant = order.OrderApplicant,
                         Status = order.Status,
-                        orderDetails = orderDetail.Select(od=>new OrderDetailDTO
+                        orderDetails = orderDetail.Select(od => new OrderDetailDTO
                         {
                             SerialNo = od.SerialNo,
                             OrderNo = od.OrderNo,
@@ -141,6 +141,23 @@ namespace ExamAPI.Services
                     response.Orders = new List<OrderDto> { o };
                     response.Success = true;
                     response.Message = "新增訂單成功";
+                    
+                    var emailRequest = new EmailRequest
+                    {
+                        ToEmail = user.UserEmail,
+                        ToName = user.UserName,
+                        Subject = "訂單確認通知",
+                        Body = $"訂單編號 {order.OrderNo} 成立",
+                        IsHtml = false // 純文字郵件
+                    };
+
+                    // 寄送確認郵件
+                    var emailResponse = await _emailService.SendEmailAsync(emailRequest);
+
+                    if (!emailResponse.Success)
+                    {
+                        _logger.LogWarning("訂單確認郵件寄送失敗：{Message}", emailResponse.Message);
+                    }                    
                 }
             }
             catch (Exception ex)
@@ -155,13 +172,117 @@ namespace ExamAPI.Services
 
         // 訂單改狀態為生產中時需檢查產品的物料表是否有庫存充足，若不足則不可以轉為生產
         // 當使用改為生產中須將該訂單的所有產品用到的數量扣掉庫存
-        public async Task<OrderResponse> UpdateOrderAsync(int serialNo, OrderRequest orderRequest)
+        public async Task<OrderResponse> UpdateOrderAsync(string orderNo)
         {
             _logger.LogTrace("進入UpdateOrderAsync");
             OrderResponse response = new OrderResponse();
             try
             {
+                if (string.IsNullOrEmpty(orderNo))
+                {
+                    _logger.LogWarning("訂單編號為空");
+                    response.Success = false;
+                    response.Message = "訂單編號為空";
+                    _logger.LogTrace("離開UpdateOrderAsync");
+                    return response;
+                }
+                var existOrder = await _orderRepository.GetOrderByOrderNoAsync(orderNo);
+                if (existOrder == null)
+                {
+                    _logger.LogWarning("訂單{OrderNo}不存在", orderNo);
+                    response.Success = false;
+                    response.Message = "訂單不存在";
+                    _logger.LogTrace("離開UpdateOrderAsync");
+                    return response;
+                }
+                var existDetails = await _orderRepository.GetOrderDetailByOrderNoAsync(orderNo);
+                if (existDetails == null || !existDetails.Any())
+                {
+                    _logger.LogWarning("訂單 {OrderNo} 沒有明細", orderNo);
+                    response.Success = false;
+                    response.Message = "訂單沒有明細";
+                    return response;
+                }
+                // 先檢查所有物料庫存是否足夠
+                foreach (var detail in existDetails)
+                {
+                    var boms = _bomRepository.GetAllBoms().Where(x => x.ProductNo == detail.ProductNo).ToList();
+                    if (!boms.Any())
+                    {
+                        _logger.LogWarning("產品{ProductNo}沒有Bom", detail.ProductNo);
+                        response.Success = false;
+                        response.Message = $"產品{detail.ProductNo}沒有Bom";
+                        return response;
+                    }
+                    foreach (var bom in boms)
+                    {
+                        var material = await _materialRepository.GetMaterialByMaterialNoAsync(bom.MaterialNo);
+                        if (material == null)
+                        {
+                            _logger.LogWarning("物料{MaterialNo}不存在", bom.MaterialNo);
+                            response.Success = false;
+                            response.Message = $"物料{bom.MaterialNo}不存在";
+                            return response;
+                        }
+                        if (material.CurrentStock < detail.Quantity * bom.MaterialUseQuantity)
+                        {
+                            _logger.LogWarning("物料{MaterialNo}庫存不足，需要{Required}，目前{Stock}"
+                                , bom.MaterialNo, detail.Quantity * bom.MaterialUseQuantity, material.CurrentStock);
+                            response.Success = false;
+                            response.Message = $"物料{bom.MaterialNo}庫存不足";
+                            return response;
+                        }
+                    }
+                }
+                var userAccount = _httpContextAccessor.HttpContext.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var user = await _userRepository.GetUserByUserAccountAsync(userAccount);
+                // 更新Material庫存
+                foreach (var detail in existDetails)
+                {
+                    var boms = _bomRepository.GetAllBoms().Where(x => x.ProductNo == detail.ProductNo).ToList();
+                    foreach (var bom in boms)
+                    {
+                        var material = await _materialRepository.GetMaterialByMaterialNoAsync(bom.MaterialNo);
 
+                        material.CurrentStock -= detail.Quantity * bom.MaterialUseQuantity;
+                        material.ModifyDate = DateTime.Now;
+                        material.Modifier = user.UserName;
+
+                        await _materialRepository.UpdateMaterialAsync(material);
+                    }
+                }
+                existOrder.Status = "生產中";
+                existOrder.ModifyDate = DateTime.Now;
+                existOrder.Modifier = user.UserName;
+                await _orderRepository.UpdateOrderAsync(existOrder);
+                int count = _context.SaveChanges();
+                if (count > 0)
+                {
+                    var o = new OrderDto
+                    {
+                        OrderNo = existOrder.OrderNo,
+                        OrderSubject = existOrder.OrderSubject,
+                        OrderApplicant = existOrder.OrderApplicant,
+                        Status = existOrder.Status,
+                        orderDetails = existDetails.Select(od => new OrderDetailDTO
+                        {
+                            SerialNo = od.SerialNo,
+                            OrderNo = od.OrderNo,
+                            ProductNo = od.ProductNo,
+                            Quantity = od.Quantity
+                        }).ToList()
+                    };
+                    _logger.LogInformation("成功訂單物料{OrderNo}", orderNo);
+                    response.Orders = new List<OrderDto> { o };
+                    response.Success = true;
+                    response.Message = "修改訂單成功";
+                }
+                else
+                {
+                    _logger.LogWarning("修改訂單失敗");
+                    response.Success = false;
+                    response.Message = "修改訂單失敗";
+                }
             }
             catch (Exception ex)
             {
@@ -172,13 +293,45 @@ namespace ExamAPI.Services
             _logger.LogTrace("離開UpdateOrderAsync");
             return response;
         }
-        public async Task<OrderResponse> CancelOrderAsync(int serialNo)
+        public async Task<OrderResponse> CancelOrderAsync(string orderNo)
         {
             _logger.LogTrace("進入CancelOrderAsync");
             OrderResponse response = new OrderResponse();
             try
             {
-
+                if (string.IsNullOrEmpty(orderNo))
+                {
+                    _logger.LogWarning("訂單編號為空");
+                    response.Success = false;
+                    response.Message = "訂單編號為空";
+                    _logger.LogTrace("離開CancelOrderAsync");
+                    return response;
+                }
+                var order = await _orderRepository.GetOrderByOrderNoAsync(orderNo);
+                var detail = await _orderRepository.GetOrderDetailByOrderNoAsync(orderNo);
+                if (order == null || detail == null)
+                {
+                    _logger.LogWarning("訂單{OrderNo}不存在", orderNo);
+                    response.Success = false;
+                    response.Message = "訂單不存在";
+                    _logger.LogTrace("離開CancelOrderAsync");
+                    return response;
+                }
+                order.Status = "取消";
+                await _orderRepository.UpdateOrderAsync(order);
+                int count = _context.SaveChanges();
+                if (count > 0)
+                {
+                    _logger.LogInformation("成功取消訂單{OrderNo}", orderNo);
+                    response.Success = true;
+                    response.Message = "取消成功";
+                }
+                else
+                {
+                    _logger.LogWarning("取消訂單失敗{OrderNo}", orderNo);
+                    response.Success = false;
+                    response.Message = "取消失敗";
+                }
             }
             catch (Exception ex)
             {

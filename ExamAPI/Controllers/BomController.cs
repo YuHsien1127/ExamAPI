@@ -27,9 +27,9 @@ namespace ExamAPI.Controllers
         /// <param name="pageSize">一頁幾筆</param>
         /// <returns></returns>
         [HttpGet]
-        public async Task<BomResponse> GetAllBomsAsync(int page = 1, int pageSize = 10)
+        public BomResponse GetAllBoms(int page = 1, int pageSize = 10)
         {
-            return await _bomService.GetAllBomsAsync(page, pageSize);
+            return _bomService.GetAllBoms(page, pageSize);
         }
 
         /// <summary>

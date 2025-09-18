@@ -3,7 +3,7 @@
     public class ProductRequest
     {
         public string ProductName { get; set; } = null!;
-        public decimal ProductPrice { get; set; }
+        public decimal? ProductPrice { get; set; }
 
     }
 }
