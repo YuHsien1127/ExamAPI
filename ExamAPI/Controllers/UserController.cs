@@ -33,7 +33,8 @@ namespace ExamAPI.Controllers
         /// <summary>
         /// 新增 User 資料
         /// </summary>
-        /// <param name="userRequest">User 資料</param>
+        /// <param name="userRequest">User 資料（Role => admin/customer/staff）</param>
+        /// <param>Role => admin/customer/staff</param>
         /// <returns></returns>
         [HttpPost]
         public async Task<UserResponse> AddUserAsync([FromBody] UserRequest userRequest)
@@ -44,7 +45,7 @@ namespace ExamAPI.Controllers
         /// <summary>
         /// 修改 User 資料
         /// </summary>
-        /// <param name="userRequest">User 資料</param>
+        /// <param name="userRequest">User 資料（Role => admin/customer/staff）</param>
         /// <param name="serial">流水號</param>
         /// <returns></returns>
         [HttpPut]

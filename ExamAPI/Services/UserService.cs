@@ -89,7 +89,7 @@ namespace ExamAPI.Services
                     return response;
                 }
                 if(string.IsNullOrEmpty(userRequest.UserAccount) || string.IsNullOrEmpty(userRequest.UserPassword) ||
-                    string.IsNullOrEmpty(userRequest.UserName) || string.IsNullOrEmpty(userRequest.UserEmail))
+                    string.IsNullOrEmpty(userRequest.UserName) || string.IsNullOrEmpty(userRequest.UserEmail) || string.IsNullOrEmpty(userRequest.UserRole))
                 {
                     _logger.LogWarning("必填欄位不能為空");
                     response.Success = false;
@@ -115,13 +115,14 @@ namespace ExamAPI.Services
                     response.Message = "UserEmail格式不正確";
                     _logger.LogTrace("離開AddStudent");
                     return response;
-                }
+                }                
                 var user = new User
                 {
                     UserAccount = userRequest.UserAccount,
                     UserPassword = userRequest.UserPassword,
                     UserName = userRequest.UserName,
                     UserEmail = userRequest.UserEmail,
+                    UserRole = userRequest.UserRole,
                     CreateDate = DateTime.Now,
                     Creator = userRequest.UserName,
                     Modifier = "System"
@@ -190,6 +191,8 @@ namespace ExamAPI.Services
                     ? existUser.UserPassword : userRequest.UserPassword;
                 existUser.UserName = string.IsNullOrEmpty(userRequest.UserName)
                     ? existUser.UserName : userRequest.UserName;
+                existUser.UserRole = string.IsNullOrEmpty(userRequest.UserRole)
+                    ? existUser.UserRole : userRequest.UserRole;
                 existUser.UserEmail = !Regex.IsMatch(userRequest.UserEmail, @"^[^@\s]+@([^@\s]+\.)+[^@\s]+$")
                     ? existUser.UserEmail : userRequest.UserEmail;
                 existUser.ModifyDate = DateTime.Now;

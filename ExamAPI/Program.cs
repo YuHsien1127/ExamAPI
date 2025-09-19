@@ -133,6 +133,6 @@ if (app.Environment.IsDevelopment())
 // 設定排程：每半小時執行一次
 RecurringJob.AddOrUpdate<OrderExportService>(
     "order-export-job",
-    service => service.ExportOrdersAsync(),
+    service => service.Production_ExportOrdersAsync(),
     "*/30 * * * *");
 app.Run();

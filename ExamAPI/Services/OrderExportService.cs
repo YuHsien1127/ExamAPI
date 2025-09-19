@@ -30,7 +30,7 @@ namespace ExamAPI.Services
         }
         public async Task<BaseResponse> Production_ExportOrdersAsync()
         {
-            _logger.LogTrace("進入ExportOrders");
+            _logger.LogTrace("進入Production_ExportOrdersAsync");
             BaseResponse response = new BaseResponse();
             try
             {
@@ -46,7 +46,7 @@ namespace ExamAPI.Services
                     _logger.LogInformation("沒有需要匯出的訂單");
                     response.Success = true;
                     response.Message = "沒有需要匯出的訂單";
-                    _logger.LogTrace("離開ExportOrders");
+                    _logger.LogTrace("離開Production_ExportOrdersAsync");
                     return response;
                 }
                 // 準備匯出資料
@@ -71,7 +71,8 @@ namespace ExamAPI.Services
                 // 序列化為 JSON
                 var json = JsonSerializer.Serialize(exportData, new JsonSerializerOptions
                 {
-                    WriteIndented = true
+                    WriteIndented = true,
+                    Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
                 });
 
                 // 確保目錄存在
@@ -119,35 +120,38 @@ namespace ExamAPI.Services
                 response.Success = false;
                 response.Message = "匯出訂單時發生錯誤";
             }
-            _logger.LogTrace("離開ExportOrders");
+            _logger.LogTrace("Production_ExportOrdersAsync");
             return response;
         }
         public async Task<BaseResponse> ExportProductAsync()
         {
+            _logger.LogTrace("進入ExportProductAsync");
             BaseResponse response = new BaseResponse();
             var baseDir = _configuration["ReportExport:BaseDir"] ?? "C:\\Users\\kiko lee\\Downloads\\Order\\Out";
             Directory.CreateDirectory(baseDir);
             var filePath = Path.Combine(baseDir, $"Product_{DateTime.Now:yyyyMMdd}.json");
-
-            var boms = _bomRepository.GetAllBoms().ToList();
-            var products = _productRepository.GetAllProducts().ToList();
-            var materials = _materialRepository.GetAllMaterials().ToList();
+            var orderDetails = _orderRepository.GetAllOrders().SelectMany(od => od.OrderDetails).ToList();
+            var products = _productRepository.GetAllProducts()
+                .Include(b => b.Boms).ThenInclude(m => m.MaterialNoNavigation).ToList();
             if (products == null)
             {
+                _logger.LogInformation("沒有產品資料");
                 response.Success = true;
                 response.Message = "沒有產品資料";
                 return response;
             }
-            var exportData = products.Select(p =>
+            var exportData = products.Select(p => new
             {
-                var m = boms.Where(b => b.ProductNo == p.ProductNo)
-                .Select(b => new
+                ProductNo = p.ProductNo,
+                Quantity = orderDetails.Where(od => od.ProductNo == p.ProductNo).Sum(od => od.Quantity),
+                ProductPrice = p.ProductPrice,
+                ProductCost = p.Boms.Sum(b => b.MaterialUseQuantity * b.MaterialNoNavigation.MaterialCost),
+                Material = p.Boms.Select(b => new
                 {
                     MaterialNo = b.MaterialNo,
                     MaterialUseQuantity = b.MaterialUseQuantity,
-                    MaterialCost = materials.Where(m => m.MaterialNo == b.MaterialNo).Select(s => s.MaterialCost).FirstOrDefault()
-                }).ToList();
-                return new { ProductNo = p.ProductNo, Count = 0, ProductPrice = p.ProductPrice, Materials = m };
+                    MaterialCost = b.MaterialNoNavigation.MaterialCost
+                }).ToList()
             });
             // 序列化為 JSON
             var json = JsonSerializer.Serialize(exportData, new JsonSerializerOptions
@@ -155,12 +159,15 @@ namespace ExamAPI.Services
                 WriteIndented = true
             });
             await File.WriteAllTextAsync(filePath, json);
+            _logger.LogInformation("匯出成功");
             response.Success = true;
             response.Message = "匯出成功";
+            _logger.LogTrace("離開ExportProductAsync");
             return response;
         }
         public async Task<BaseResponse> ExportOrdersAsync()
         {
+            _logger.LogTrace("進入ExportOrdersAsync");
             BaseResponse response = new BaseResponse();
             var baseDir = _configuration["ReportExport:BaseDir"] ?? "C:\\Users\\kiko lee\\Downloads\\Order\\Out";
             Directory.CreateDirectory(baseDir);
@@ -169,30 +176,31 @@ namespace ExamAPI.Services
             var orders = _orderRepository.GetAllOrders().ToList();
             if (orders == null)
             {
+                _logger.LogInformation("沒有訂單資料");
                 response.Success = true;
                 response.Message = "沒有訂單資料";
                 return response;
             }
-            var products = _productRepository.GetAllProducts().ToList();
-            var boms = _bomRepository.GetAllBoms().ToList();
-            var materials = _materialRepository.GetAllMaterials().ToList();
+            var products = _productRepository.GetAllProducts()
+                .Include(b => b.Boms).ThenInclude(m => m.MaterialNoNavigation).ToList();
             var exportData = orders.Select(o => new
             {
                 OrderNo = o.OrderNo,
                 OrderDetails = o.OrderDetails.Select(od =>
                 {
                     var product = products.FirstOrDefault(p => p.ProductNo == od.ProductNo);
+                    var boms = product.Boms;
+
                     return new
                     {
                         ProductNo = od.ProductNo,
                         Quantity = od.Quantity,
                         Price = od.Quantity * product.ProductPrice,
-                        Materials = boms.Where(b => b.ProductNo == od.ProductNo)
-                        .Select(b => new
+                        Materials = boms.Select(b => new
                         {
                             MaterialNo = b.MaterialNo,
                             MaterialUseQuantity = b.MaterialUseQuantity,
-                            MaterialCost = materials.Where(m => m.MaterialNo == b.MaterialNo).Select(s => s.MaterialCost).FirstOrDefault()
+                            MaterialCost = b.MaterialNoNavigation.MaterialCost
                         }).ToList()
                     };
                 }).ToList()
@@ -203,8 +211,10 @@ namespace ExamAPI.Services
                 WriteIndented = true
             });
             await File.WriteAllTextAsync(filePath, json);
+            _logger.LogInformation("匯出成功");
             response.Success = true;
             response.Message = "匯出成功";
+            _logger.LogTrace("離開ExportOrdersAsync");
             return response;
         }
     }
